@@ -1,7 +1,7 @@
 © 2026 Isaac Flake. All Rights Reserved.
 
 # FLAKE GAMES
-### Dya'Akara · Torcain's Run · The 4 Brothers Worlds · Skaar Uverkhron · Little Dungeon · Punk Races · Stryx Pilot
+### Dya'Akara · Torcain's Run · The 4 Brothers Worlds · Skaar Uverkhron · Little Dungeon · Punk Races · Stryx Pilot · Lútut Rider
 
 **▶ Play now: [dyaakara-yak.web.app](https://dyaakara-yak.web.app)**
 
@@ -20,10 +20,11 @@ Every game in this repo, behind one home page and one account. Zero dependencies
 | Little Dungeon (mini game, once Legends of Pia'don) | `mini-games/little-dungeon/index.html` |
 | Punk Races (mini game) | `mini-games/punk-races/index.html` |
 | Stryx Pilot (mini game) | `mini-games/stryx-pilot/index.html` |
+| Lútut Rider (mini game) | `mini-games/lutut-rider/index.html` |
 
 **One account for everything.** You sign in (or create an account) once, on the home page; every main game picks that up, and every game has a way back to the home page. **Mini games need no account:** a guest plays straight away (Little Dungeon keeps a guest's run in the browser and pays no gold); a guest who signs in later carries their run in progress onto the account. The account *is* the old Dya'Akara account (the same `dya_accounts` row, email and password), so nobody had to make a new one. Opening a main game while signed out sends you to the home page to sign in, then straight back. Code: `js/flake/account.js`.
 
-- **Saves live on the account**, always online: Dya'Akara and Little Dungeon on the account row, Torcain's Run in `dya_config` `rpg_save:<id>`, the 4 Brothers Worlds in `dya_config` under `fbw:<id>:<key>`, one row per save key (its `js/cloud.js` section), and Punk Races and Stryx Pilot in `dya_config` `mini:pr:<id>` and `mini:sp:<id>` (`js/flake/mini_save.js`, which also keeps a guest's save in the browser and carries it onto the account at the first sign-in).
+- **Saves live on the account**, always online: Dya'Akara and Little Dungeon on the account row, Torcain's Run in `dya_config` `rpg_save:<id>`, the 4 Brothers Worlds in `dya_config` under `fbw:<id>:<key>`, one row per save key (its `js/cloud.js` section), and Punk Races, Stryx Pilot and Lútut Rider in `dya_config` `mini:pr:<id>`, `mini:sp:<id>` and `mini:lr:<id>` (`js/flake/mini_save.js`, which also keeps a guest's save in the browser and carries it onto the account at the first sign-in).
 - **A new account** made on the home page starts with just email, password and display name. The first time it opens Dya'Akara, the game asks for an appearance and home region, gives the starting resources, and runs the tutorial.
 - **Bans** can be for one game or for every game (Admin Panel → General → Bans, or each game's own Bans page). An every-game ban stops the account at the home page too.
 - **Your account** (click your name on the home page): change your display name or password, or delete the account and everything every game saved on it.
@@ -37,7 +38,7 @@ Every game in this repo, behind one home page and one account. Zero dependencies
 - **Players:** every account in every game, password reset requests, set a new password, rename, ban, Dya'Akara's own account editor, delete.
 - **Bans** and **Admin Password**.
 
-Then one button per game. Dya'Akara's is its original full panel (plus its own Announcements). Torcain's Run, the 4 Brothers Worlds, Little Dungeon, Punk Races and Stryx Pilot each have an **Overview**, **Players** (every save: view and edit it as JSON, reset it, ban the player), **Announcements** aimed at that game, and **Bans**; the 4 Brothers also keep their **Guide**. A reset leaves a marker the game honours, so the copy in the player's browser doesn't come back.
+Then one button per game. Dya'Akara's is its original full panel (plus its own Announcements). Torcain's Run, the 4 Brothers Worlds, Little Dungeon, Punk Races, Stryx Pilot and Lútut Rider each have an **Overview**, **Players** (every save: view and edit it as JSON, reset it, ban the player), **Announcements** aimed at that game, and **Bans**; the 4 Brothers also keep their **Guide**. A reset leaves a marker the game honours, so the copy in the player's browser doesn't come back.
 
 **The admin password** is one password for every device, kept online as a slow salted hash (PBKDF2, in `dya_config` `admin_auth`). There is no built-in password any more. The first time `admin.html` opens after this change, it asks for the old admin password once and a new one (at least 8 characters). Change it any time under General → Admin Password. It guards the panel; it is not database security — the Supabase tables still accept writes from anyone holding the site's public key (see `supabase/schema.sql`).
 
@@ -119,6 +120,20 @@ A flying game in **`mini-games/stryx-pilot/`**. You are a pilot Stryx, a flat st
 - **More to fly for:** a heavy hold answers slowly; skimming fast past a Tatu is a paid **slingshot**; ports have market days, festivals, weddings and the Guild's post day (jobs bound there pay half again); and **skiffs adrift** blink red lanterns: hold alongside one and your vines take it in tow.
 - **The look:** the Tatu and Kalo are painted pixel by pixel from noise (seas, coasts, forests, mountains, ice, craters, Leotik's lava), with drifting clouds, a night side with town lamps, glints on the sea and a glow of air; up close their horizons rise in mountains and trees. A nebula and two layers of stars behind, an aurora for the Waves of Memory, and bloom on the seed, the embers in the hull, the lanterns and the lightning.
 - Code: `js/sp_data.js` (worlds, ports, jobs, parts, ranks, crews, ships, factions, orders, the log), `js/sp_sim.js` (the sky, the ship, the hazards, pirates, jobs and an autopilot; runs in node), `js/sp_battle.js` (the boarding battle rules and their AI; runs in node), `js/sp_battle_view.js` (the battle screen), `js/sp_art.js` (drawing), `js/sp_main.js` (the game). Tests: `tests/test_stryx_pilot.js`.
+
+## Lútut Rider (mini game)
+
+A distance game in **`mini-games/lutut-rider/`**. You are an Eikar on the back of a Lútut. Ride out from the roost over a long, rolling land as far as it will go, then spend the teeth you bring back on a better Lútut and go further. Design notes: `mini-games/lutut-rider/DESIGN.md`.
+
+- **Two pedals:** **BEAT** (`→` `D` `Space`, or the right pedal) pushes you on and lifts the nose, runs on the ground and leaps from standing. Every beat costs meat. **TUCK** (`←` `A`, or the left pedal) folds the wings: the nose drops and you dive for speed, or brake on the ground. Let go of both and it glides, for free.
+- **A stone with wings:** a Lútut is heavy. It holds the air only while it moves, stalls if the nose is too high, and can't climb on its wings alone, so speed from diving is everything.
+- **Meat is fuel:** the gullet empties as you fly. Lútut eat meat only: Rock Hoppers, Albali Byrds (their horns sting and numb the wings), Shellbacks (only a fast Lútut can suck one in) and Mud Eels. It sucks them in and never bites.
+- **Head of stone, tail of glass:** head first and fast, it breaks standing stones (and, when big, trees). The tail cracks if it strikes first, slaps down hard or catches something, and shatters after too many cracks. Your Eikar is thrown by a landing far too hard or too far off the slope.
+- **Five regions:** Beuhk Downs, The Road North (trees, warm air), The Shard Canyons (mesas and chasms), Duskwater Marsh (pools: stone sinks) and Storm Ridge (gusting wind). Each has medals at 500, 1500, 3000 and 6000 m.
+- **Progress:** teeth from pickups, prey, tricks (clean landings, long air, skimming, loops, smashes) and distance. Raise a Grown or Old Lútut, upgrade the wing membrane, gullet, tail and saddle (10 levels each), unlock regions, earn feats.
+- **The opening is 3D:** before you ride a Lútut you tame it (`js/lr_tame3d.js`), with Torcain's Run's own Lútut model (`rpg/assets/models/lutut.glb`) and Eikar (`rpg/js/actors.js`). Creep up while it isn't looking, leap on, lean against its rolls and grab on through its screeches until it gives in. Every Lútut you raise is tamed this way first.
+- **How the ride looks:** Tuftwood's clarity with the real models' shapes. The land, sky, trees, prey and menus are painted the way Four Brothers: Tuftwood is (`js/lr_art_tw.js`: ink lines, soft gradients, pom-pom trees, three-tone grass, Gaegu). The Lútut and its Eikar are sprites rendered from Torcain's Run's own 3D models, side on like the 4 Brothers pixel sprite, posed by the model's own clips (Fly, Glide, Dive, Walk, Stand, Suck, Screech, Death), with an ink outline (`img/model/`, made by `node mini-games/lutut-rider/tools/render_sprites.js`). The earlier pixel look (`js/lr_art.js`) is kept in the folder but not loaded.
+- **Code:** `js/lr_data.js` (numbers), `js/lr_sim.js` (the land and the ride, no drawing, runs in Node), `js/lr_art_tw.js` (the drawing), `img/model/` + `tools/render_sprites.js` (the model sprites), `js/lr_tame3d.js` (the 3D taming), `js/lr_main.js` (the roost, the ride screen, pay, sounds, saving). Tests: `node tests/test_lutut_rider.js`.
 
 ## Skaar Uverkhron (turn-based strategy)
 

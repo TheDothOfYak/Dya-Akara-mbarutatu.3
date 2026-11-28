@@ -23,7 +23,7 @@ const ALT_STUDIO = ['Flake', 'FlakeGames'];
 const GAMES = [
   { id: 'hub', file: 'index.html', name: STUDIO, alt: ALT_STUDIO,
     title: 'Flake Games — Dya’Akara, Torcain’s Run, The 4 Brothers Worlds and more',
-    desc: 'Flake Games: free browser games set in the worlds of the Pia’don system and the Mbaru Tatu — Dya’Akara, Torcain’s Run, The 4 Brothers Worlds, Skaar Uverkhron, Little Dungeon, Punk Races and Stryx Pilot.',
+    desc: 'Flake Games: free browser games set in the worlds of the Pia’don system and the Mbaru Tatu — Dya’Akara, Torcain’s Run, The 4 Brothers Worlds, Skaar Uverkhron, Little Dungeon, Punk Races, Stryx Pilot and Lútut Rider.',
     img: 'img/icon-512.png', priority: '1.0' },
   { id: 'game', file: 'dya-akara.html', name: 'Dya’Akara', alt: ['Dya\'Akara', 'Dya\'akara', 'Dyaakara', 'Dya Akara', 'Dya-Akara'],
     title: 'Dya’Akara — the token game of the Mbaru Tatu | Flake Games',
@@ -61,6 +61,10 @@ const GAMES = [
     title: 'Stryx Pilot — fly cargo between the three Tatu | Flake Games',
     desc: 'Stryx Pilot: fly cargo and folk between the three Tatu. A free mini game from Flake Games, the makers of Dya’Akara.',
     genre: ['Flight', 'Arcade'], img: 'img/previews/sp.jpg', priority: '0.7' },
+  { id: 'lr', file: 'mini-games/lutut-rider/index.html', name: 'Lútut Rider', alt: ['Lutut Rider'],
+    title: 'Lútut Rider — ride a Lútut as far as it will go | Flake Games',
+    desc: 'Lútut Rider: ride a Lútut out from the roost as far as it will go, hunting as you fly. A free mini game from Flake Games, the makers of Dya’Akara.',
+    genre: ['Racing', 'Arcade'], img: 'img/previews/lr.jpg', priority: '0.7' },
 ];
 
 /* pages that should stay out of search results */

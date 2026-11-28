@@ -52,6 +52,7 @@
     { id: 'ld', name: 'Little Dungeon', href: 'mini-games/little-dungeon/index.html', tagline: 'A tiny card-battling dungeon crawl' },
     { id: 'pr', name: 'Punk Races', href: 'mini-games/punk-races/index.html', tagline: 'Swing a Punk tree to tree for the purse' },
     { id: 'sp', name: 'Stryx Pilot', href: 'mini-games/stryx-pilot/index.html', tagline: 'Fly cargo and folk between the three Tatu' },
+    { id: 'lr', name: 'Lútut Rider', href: 'mini-games/lutut-rider/index.html', tagline: 'Ride a Lútut as far as it will go' },
     { id: 'tw', name: 'Four Brothers: Tuftwood', href: 'mini-games/tuftwood/index.html', tagline: 'Four brothers, one painted forest' },
   ];
   const SCOPES = [['all', 'Every game']].concat(GAMES.concat(MINI).map(g => [g.id, g.name]));
@@ -327,7 +328,7 @@
       rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('su:' + accId + ':*')),
       rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('su_rooms:' + accId)),
       rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('su_rec:' + accId)),
-      rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('mini:*:' + accId)),   // Punk Races, Stryx Pilot (js/flake/mini_save.js)
+      rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('mini:*:' + accId)),   // Punk Races, Stryx Pilot, Lútut Rider (js/flake/mini_save.js)
       rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('ban:' + accId)),
       rest('DELETE', 'dya_bans?account_id=eq.' + id),
     ].map(p => p.catch(() => null)));

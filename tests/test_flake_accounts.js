@@ -201,7 +201,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   await F.saveHubConfig(hub2);
   check('the admin’s order is used, unnamed games go last', F.orderOf(F.hubConfig(), 'main').join(',') === '4bw,game,rpg,su');
   check('a hidden game is left out, coming-soon goes after', ids(F.shown(F.hubConfig(), 'main')) === '4bw,game,su,soon_x');
-  check('a coming-soon mini game shows with the mini games', ids(F.shown(F.hubConfig(), 'mini')) === 'ld,pr,sp,soon_m');
+  check('a coming-soon mini game shows with the mini games', ids(F.shown(F.hubConfig(), 'mini')) === 'ld,pr,sp,lr,tw,soon_m');
   check('a coming-soon slot has no link to play', F.shown(F.hubConfig(), 'main')[3].soon === true && !F.shown(F.hubConfig(), 'main')[3].href);
   await F.savePreview('rpg', 'data:image/jpeg;base64,AAAA');
   check('an uploaded preview reads back', (await F.fetchPreview('rpg')) === 'data:image/jpeg;base64,AAAA');

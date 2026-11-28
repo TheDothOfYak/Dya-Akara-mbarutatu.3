@@ -1,7 +1,8 @@
 // © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — js/flake/mini_save.js
-   Saves for the small canvas mini games (Punk Races, Stryx Pilot).
+   Saves for the small canvas mini games (Punk Races, Stryx Pilot,
+   Lútut Rider).
 
    Mini games need no account:
      • a guest's save lives in this browser (localStorage
