@@ -7,7 +7,7 @@ Built in Blender (5.3, run headless through the `bpy` Python module) from Isaac'
 GitHub, so it stays in Drive. **Not in any game yet**: this folder is the source, waiting for review.
 
 ## What's here
-- `lutut.glb`: the game-ready model (3.5 MB). 41k triangles, 52 bones, 4 textures (2048 px), 10 animations, 2 eye lights.
+- `lutut.glb`: the game-ready model (3.7 MB). 41k triangles, 52 bones, 4 textures (2048 px), 10 animations, 2 eye lights.
   Faces +Z in three.js, feet at the origin, about 3.3 units wingtip to wingtip.
 - `Lutut.blend`: the rigged, painted and animated Blender file (textures packed in).
 - `blender/`: the scripts that made it, in order (see below), so any step can be changed and re-run.
@@ -18,7 +18,7 @@ GitHub, so it stays in Drive. **Not in any game yet**: this folder is the source
   ("Cone") hanging under the tail. They looked like leftover reference shapes, so they were left out.
   Only the creature itself ("Full") is used.
 - **Game mesh:** decimated from 315k to 41k triangles; the full sculpt detail is baked into a normal map.
-- **Skeleton (46 bones):** root, spine, chest, head, upper and lower lip (`jaw_up`, `jaw_low`),
+- **Skeleton (52 bones):** root, spine, chest, head, upper and lower lip (`jaw_up`, `jaw_low`),
   13 tail bones (`tail1`…`tail13`) plus `tail_ball` (the spiked ball is weighted 100% to it, so it swings as one solid club), and for each wing `upperarm`, `forearm` and four two-bone fingers;
   four legs (`front_`/`back_` `thigh`, `shin`, `foot`, `.L`/`.R`). Skinned with Blender's automatic weights,
   4 bones per vertex.
