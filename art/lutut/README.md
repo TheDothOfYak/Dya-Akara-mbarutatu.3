@@ -72,3 +72,14 @@ Previews: `look.py`, `lookc.py` (eyes and body, day and night), `asheet.py`, `po
 On day two (the forest) and day four (the mountain pass), about twenty seconds into the day's walk, a Lútut
 crosses the sky over the mountains ahead: flapping on day two, gliding low through the pass on day four. The
 camera turns to watch it while Tanoc and the Carpenter talk about it, so it can't be missed.
+
+## The wingbeat
+The arm and every joint on the wing move straight up and back down the same path: there is no forward/back
+sweep, the membrane twist stays steady, the fingertips don't lag, and the fingers' slight fold follows how high
+the wing is (a little folded at the top, open at the bottom). `blender/looparea.py` measures the area each joint's
+path encloses through one beat (zero means no loop).
+
+## In the Rokarvac (`rpg/js/lutut_viewer.js`)
+The journal's Notes open with "The Lútut" and a *Look at it* button: a small viewer inside the journal to turn it
+round, zoom, and play every clip, by day or night, young, grown or old. It has its own renderer, made when the
+page opens and thrown away when it closes.
